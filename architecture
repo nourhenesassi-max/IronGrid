@@ -1,0 +1,38 @@
+lib/
+  main.dart
+  app.dart
+
+  core/
+    config/
+      api_config.dart
+
+    network/
+      api_client.dart
+    
+    storage/
+       secure_store.dart
+
+    ui/
+      app_colors.dart
+      app_widgets.dart
+
+    features/
+      auth/
+      data/
+        auth_service.dart
+      presentation/
+        login_screen.dart
+        signup_screen.dart
+      dashboard/
+        presentation/
+          dashboard_screen.dart
+      employe/
+        data/
+          employe_service.dart
+        models/
+          employe_dashboard_model.dart
+      presentation/
+        widgets/
+          expense_scan_card_widget.dart
+          leave_request_card_widget.dart
+....
