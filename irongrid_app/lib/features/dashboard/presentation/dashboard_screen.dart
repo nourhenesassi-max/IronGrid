@@ -13,7 +13,7 @@ class DashboardScreen extends StatelessWidget {
           onPressed: () async {
             await SecureStore.clearAll();
             if (context.mounted) {
-              Navigator.pushReplacementNamed(context, "/");
+              Navigator.pushReplacementNamed(context, "/login");
             }
           },
           child: const Text("Logout"),

@@ -24,8 +24,23 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>irongridsurveillance</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Cette application utilise la camera pour scanner les recus.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>IronGrid utilise le reseau local pour joindre le backend et les flux de surveillance.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cette application accede a la galerie pour selectionner les recus.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,10 +81,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-
-	<key>NSCameraUsageDescription</key>
-	<string>Cette application utilise la caméra pour scanner les reçus.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Cette application accède à la galerie pour sélectionner les reçus.</string>
 </dict>
 </plist>

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/ui/app_colors.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../data/auth_service.dart';
+import 'package:irongrid_app/features/auth/data/services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -11,71 +11,95 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  final _auth = AuthService();
+  final AuthService _auth = AuthService();
 
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+  final TextEditingController _firstNameCtrl = TextEditingController();
+  final TextEditingController _lastNameCtrl = TextEditingController();
+  final TextEditingController _emailCtrl = TextEditingController();
+  final TextEditingController _passCtrl = TextEditingController();
 
   bool _obscure = true;
   bool _loading = false;
 
-  final List<String> _roleLabels = const [
-    "Manager",
-    "RH",
-    "Finance",
-    "Employé",
-  ];
-
-  /// ✅ Must match login mapping
-  final Map<String, String> _roleToApi = const {
-    "Manager": "MANAGER",
-    "RH": "RH",
-    "Finance": "FINANCE",
-    "Employé": "EMPLOYE",
-  };
-
-  String _roleLabel = "Employé";
-
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
+  String? _validateEmail(String email) {
+    if (email.isEmpty) return "Veuillez saisir votre email.";
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!regex.hasMatch(email)) return "Adresse email invalide.";
+    return null;
   }
 
   Future<void> _signup() async {
-    final name = _nameCtrl.text.trim();
-    final email = _emailCtrl.text.trim();
+    if (_loading) return;
+
+    final firstName = _firstNameCtrl.text.trim();
+    final lastName = _lastNameCtrl.text.trim();
+    final email = _emailCtrl.text.trim().toLowerCase();
     final pass = _passCtrl.text.trim();
 
-    if (name.isEmpty || email.isEmpty || pass.isEmpty) {
-      _snack("Veuillez remplir tous les champs.");
+    if (firstName.isEmpty) {
+      _snack("Veuillez saisir votre prénom.");
+      return;
+    }
+
+    if (lastName.isEmpty) {
+      _snack("Veuillez saisir votre nom.");
+      return;
+    }
+
+    final emailError = _validateEmail(email);
+    if (emailError != null) {
+      _snack(emailError);
+      return;
+    }
+
+    if (pass.isEmpty) {
+      _snack("Veuillez saisir votre mot de passe.");
+      return;
+    }
+
+    if (pass.length < 6) {
+      _snack("Le mot de passe doit contenir au moins 6 caractères.");
       return;
     }
 
     setState(() => _loading = true);
-    try {
-      final roleApi = _roleToApi[_roleLabel]!;
 
-      await _auth.signup(
-        role: roleApi,
-        name: name,
+    try {
+      final message = await _auth.signup(
+        firstName: firstName,
+        lastName: lastName,
         email: email,
         password: pass,
       );
 
       if (!mounted) return;
 
-      _snack("Compte créé. Connectez-vous.");
-      Navigator.pushReplacementNamed(context, "/login"); // ✅ go to login
+      _snack(message);
+
+      await Future.delayed(const Duration(milliseconds: 600));
+
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, "/login", (route) => false);
     } catch (e) {
-      _snack(e.toString());
+      _snack(e.toString().replaceFirst('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -97,33 +121,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: Column(
             children: [
               const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "Rôle",
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Center(
+                child: Image.asset(
+                  'assets/images/auth_illustration.png',
+                  height: 180,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.account_circle,
+                      size: 120,
+                      color: Colors.grey,
+                    );
+                  },
                 ),
               ),
-              const SizedBox(height: 8),
-              RoleDropdown(
-                value: _roleLabel,
-                items: _roleLabels,
-                onChanged: (v) => setState(() => _roleLabel = v),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               AppInput(
-                hint: "Nom complet",
+                hint: "Prénom",
+                icon: Icons.person_outline,
+                controller: _firstNameCtrl,
+              ),
+              const SizedBox(height: 14),
+              AppInput(
+                hint: "Nom",
                 icon: Icons.badge_outlined,
-                controller: _nameCtrl,
+                controller: _lastNameCtrl,
               ),
               const SizedBox(height: 14),
               AppInput(
                 hint: "Email",
-                icon: Icons.person_outline,
+                icon: Icons.email_outlined,
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
               ),
@@ -158,7 +185,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.4,
+                          ),
                         )
                       : const Text(
                           "Créer le compte",

@@ -15,32 +15,63 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    PasswordEncoder passwordEncoder() {
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
-                .cors(Customizer.withDefaults())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
+            .csrf(csrf -> csrf.disable())
+            .cors(Customizer.withDefaults())
+            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(h -> h.frameOptions(f -> f.disable()))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/test/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
+                // ADMIN
+                .requestMatchers(HttpMethod.DELETE, "/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        .requestMatchers("/api/manager/**").hasRole("MANAGER")
-                        .requestMatchers("/api/employe/**").hasRole("EMPLOYE")
-                        .requestMatchers("/api/rh/**").hasRole("RH")
-                        .requestMatchers("/api/finance/**").hasRole("FINANCE")
-                        .requestMatchers("/api/it/**").hasRole("IT")
+                .requestMatchers("/files/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/me").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/me/avatar").authenticated()
 
-                        .anyRequest().authenticated()
-                )
-                .headers(h -> h.frameOptions(f -> f.disable()))
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .requestMatchers("/api/time/**").hasRole("EMPLOYE")
+                .requestMatchers("/api/leave/**").hasRole("EMPLOYE")
+                .requestMatchers(HttpMethod.GET, "/api/leave/stats").hasRole("EMPLOYE")
+                .requestMatchers("/api/expenses/**").hasRole("EMPLOYE")
+
+                .requestMatchers("/api/manager/**").hasRole("MANAGER")
+
+                .requestMatchers(HttpMethod.GET, "/api/notifications/**").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/notifications/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/notifications/send").hasAnyRole("MANAGER", "ADMIN")
+
+                .requestMatchers(HttpMethod.GET, "/api/users/employees").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.DELETE, "/api/users/employees/*").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.DELETE, "/api/users/employees/*/team").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.GET, "/api/users/messageable").hasAnyRole("EMPLOYE", "ADMIN", "MANAGER")
+
+                .requestMatchers("/api/messages/**").hasAnyRole("EMPLOYE", "RH", "ADMIN", "MANAGER")
+                .requestMatchers(HttpMethod.GET, "/api/employee/projects/**").hasRole("EMPLOYE")
+
+                .requestMatchers("/api/rh/**").hasRole("RH")
+                .requestMatchers(HttpMethod.GET, "/api/machines/**").hasRole("EMPLOYE")
+                .requestMatchers(HttpMethod.POST, "/api/machines/*/verify").hasRole("EMPLOYE")
+                .requestMatchers(HttpMethod.PATCH, "/api/machines/*/status").hasAnyRole("ADMIN", "MANAGER")
+
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

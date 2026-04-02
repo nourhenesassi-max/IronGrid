@@ -1,17 +1,18 @@
 package com.example.irongrid.auth;
 
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.example.irongrid.auth.dto.AuthResponse;
+import com.example.irongrid.auth.dto.ForgotPasswordRequest;
+import com.example.irongrid.auth.dto.MessageResponse;
 import com.example.irongrid.auth.dto.LoginRequest;
+import com.example.irongrid.auth.dto.ResetPasswordRequest;
+import com.example.irongrid.auth.dto.SignupPendingResponse;
+import com.example.irongrid.auth.dto.SignupRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final AuthService authService;
@@ -21,7 +22,22 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@RequestBody LoginRequest req) {
-        return authService.login(req);
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest req) {
+        return ResponseEntity.ok(authService.login(req));
+    }
+
+    @PostMapping("/signup")
+    public ResponseEntity<SignupPendingResponse> signup(@Valid @RequestBody SignupRequest req) {
+        return ResponseEntity.status(201).body(authService.signup(req));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
+        return ResponseEntity.ok(authService.forgotPassword(req));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest req) {
+        return ResponseEntity.ok(authService.resetPassword(req));
     }
 }

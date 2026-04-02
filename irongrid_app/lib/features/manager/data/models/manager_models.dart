@@ -85,3 +85,21 @@ class TeamMember {
     required this.avatarUrl,
   });
 }
+
+class ManagerAssignedProject {
+  final String id;
+  final String projectName;
+  final String employeeName;
+  final String deadline;
+  final String priority;
+  final List<String> tasks;
+
+  ManagerAssignedProject({
+    required this.id,
+    required this.projectName,
+    required this.employeeName,
+    required this.deadline,
+    required this.priority,
+    required this.tasks,
+  });
+}
