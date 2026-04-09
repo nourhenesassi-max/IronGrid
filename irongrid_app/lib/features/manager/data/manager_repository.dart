@@ -1,101 +1,84 @@
-import 'models/manager_models.dart';
+import 'models/employee_model.dart';
+import 'models/manager_project_model.dart';
+import 'models/notification_model.dart';
+import 'services/manager_api_service.dart';
 
 class ManagerRepository {
-  ManagerProfile getProfile() {
-    return ManagerProfile(
-      name: "Sophie Martin",
-      site: "Site de Production Lyon",
-      role: "Responsable d'Équipe",
-      notifCount: 7,
-      avatarUrl: "https://i.pravatar.cc/150?img=47",
+  final ManagerApiService _api = ManagerApiService();
+
+  Future<List<EmployeeModel>> getEmployees() async {
+    return _api.getEmployees();
+  }
+
+  Future<void> removeEmployeeFromTeam(int employeeId) async {
+    return _api.removeEmployeeFromTeam(employeeId);
+  }
+
+  Future<void> assignProject({
+    required String projectName,
+    required int employeeId,
+    required String deadline,
+    required String priority,
+    required List<ProjectTaskModel> tasks,
+    String description = '',
+  }) async {
+    return _api.assignProject(
+      projectName: projectName,
+      employeeId: employeeId,
+      deadline: deadline,
+      priority: priority,
+      description: description,
+      tasks: tasks.map((task) => task.toJson()).toList(),
     );
   }
 
-  List<StatKpi> getKpis() => [
-        StatKpi(
-          value: "12",
-          label: "Projets Actifs",
-          badge: "+2",
-          iconCodePoint: 0xe54c, // Icons.work_outline
-          colorValue: 0xFF163B8A,
-        ),
-        StatKpi(
-          value: "94%",
-          label: "Taux de Présence",
-          badge: "+3%",
-          iconCodePoint: 0xe3b3, // Icons.group_outlined
-          colorValue: 0xFF0B8E5B,
-        ),
-        StatKpi(
-          value: "7",
-          label: "Approbations",
-          badge: "!",
-          iconCodePoint: 0xe4c3, // Icons.pending_actions_outlined
-          colorValue: 0xFFE07A00,
-        ),
-      ];
+  Future<void> updateProject({
+    required int projectId,
+    required String projectName,
+    required int employeeId,
+    required String deadline,
+    required String priority,
+    required List<ProjectTaskModel> tasks,
+    String description = '',
+  }) async {
+    return _api.updateProject(
+      projectId: projectId,
+      projectName: projectName,
+      employeeId: employeeId,
+      deadline: deadline,
+      priority: priority,
+      description: description,
+      tasks: tasks.map((task) => task.toJson()).toList(),
+    );
+  }
 
-  List<ApprovalItem> getApprovals() => [
-        ApprovalItem(
-          avatarUrl: "https://i.pravatar.cc/150?img=12",
-          name: "Marc Dubois",
-          pill: "Feuille de Temps",
-          project: "Maintenance Préventive",
-          week: "Semaine 7",
-          submitted: "Soumis le 2026-02-12",
-          amountOrHours: "42.5h",
-        ),
-        ApprovalItem(
-          avatarUrl: "https://i.pravatar.cc/150?img=32",
-          name: "Julie Bernard",
-          pill: "Frais",
-          project: "Installation Ligne 4",
-          week: "Semaine 7",
-          submitted: "Soumis le 2026-02-11",
-          amountOrHours: "128 €",
-        ),
-      ];
+  Future<List<ManagerProjectModel>> getProjects() async {
+    return _api.getManagerProjects();
+  }
 
-  List<ProjectItem> getProjects() => [
-        ProjectItem(
-          title: "Maintenance Préventive",
-          subtitle: "Production Interne",
-          statusText: "Dans les temps",
-          statusColorValue: 0xFF0B8E5B,
-          progress: 0.75,
-          due: "2026-03-15",
-          team: "8 membres",
-          budget: "45 000 €",
-          spent: "33 750 €",
-        ),
-        ProjectItem(
-          title: "Installation Ligne 4",
-          subtitle: "Expansion Usine",
-          statusText: "À risque",
-          statusColorValue: 0xFFE07A00,
-          progress: 0.45,
-          due: "2026-04-30",
-          team: "12 membres",
-          budget: "120 000 €",
-          spent: "62 000 €",
-        ),
-      ];
+  Future<void> deleteProject(int projectId) async {
+    return _api.deleteProject(projectId);
+  }
 
-  List<TeamMember> getTeam() => [
-        TeamMember(
-          name: "Marc Dubois",
-          role: "Technicien",
-          avatarUrl: "https://i.pravatar.cc/150?img=12",
-        ),
-        TeamMember(
-          name: "Julie Bernard",
-          role: "Assistante",
-          avatarUrl: "https://i.pravatar.cc/150?img=32",
-        ),
-        TeamMember(
-          name: "Karim Benali",
-          role: "Ingénieur",
-          avatarUrl: "https://i.pravatar.cc/150?img=68",
-        ),
-      ];
+  Future<List<NotificationModel>> getNotifications() async {
+    return _api.getNotifications();
+  }
+
+  Future<void> markNotificationAsRead(int id) async {
+    return _api.markNotificationAsRead(id);
+  }
+
+  Future<void> sendNotification({
+    required String title,
+    required String content,
+    required String type,
+    required int receiverId,
+  }) async {
+    return _api.sendNotification(
+      title: title,
+      content: content,
+      type: type,
+      receiverId: receiverId,
+    );
+  }
 }

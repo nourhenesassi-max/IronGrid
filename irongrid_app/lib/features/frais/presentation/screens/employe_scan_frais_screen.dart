@@ -1,9 +1,9 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/ui/app_colors.dart';
-import '../../data/expense_repository.dart';
-import '../../data/models/expense_model.dart';
+import '../../data/expense_service.dart';
 
 class EmployeScanFraisScreen extends StatefulWidget {
   const EmployeScanFraisScreen({super.key});
@@ -15,11 +15,11 @@ class EmployeScanFraisScreen extends StatefulWidget {
 class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _service = ExpenseService();
 
   String _category = "Transport";
   DateTime _date = DateTime.now();
   bool _loading = false;
-
   File? _image;
 
   final _categories = const [
@@ -38,7 +38,10 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -48,10 +51,17 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
       firstDate: DateTime(2024, 1, 1),
       lastDate: DateTime(2030, 12, 31),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null) {
+      setState(() => _date = picked);
+    }
   }
 
   Future<void> _takePhoto() async {
+    if (kIsWeb) {
+      _snack("Pour la photo du reçu, teste cet écran sur Android/iPhone.");
+      return;
+    }
+
     try {
       final picker = ImagePicker();
       final xfile = await picker.pickImage(
@@ -67,38 +77,47 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
     }
   }
 
-  Future<void> _saveTempAndGoList() async {
+  Future<void> _submitExpense() async {
+    if (kIsWeb) {
+      _snack("Ce flux photo est prévu pour Android/iPhone.");
+      return;
+    }
+
     if (_image == null) {
       _snack("Veuillez prendre une photo du reçu.");
       return;
     }
 
-    final amount =
-        double.tryParse(_amountCtrl.text.trim().replaceAll(',', '.'));
+    final amount = double.tryParse(
+      _amountCtrl.text.trim().replaceAll(',', '.'),
+    );
+
     if (amount == null || amount <= 0) {
       _snack("Montant invalide.");
       return;
     }
 
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 250)); // simulate
 
-    // ✅ SAVE TEMP IN MEMORY
-    ExpenseRepository().add(
-      Expense(
+    try {
+      await _service.createExpense(
         category: _category,
         amount: amount,
-        date: _date,
+        expenseDate: _date,
         note: _noteCtrl.text.trim(),
-        imagePath: _image!.path,
-      ),
-    );
+        receiptFile: _image!,
+      );
 
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    // ✅ Replace so list shows directly and back doesn't return to half-filled form
-    Navigator.pushReplacementNamed(context, "/employe-frais");
+      if (!mounted) return;
+      _snack("Frais envoyé avec succès.");
+      Navigator.pushReplacementNamed(context, "/employe-frais");
+    } catch (e) {
+      _snack("Erreur envoi frais: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
@@ -122,8 +141,10 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Photo du reçu",
-                    style: TextStyle(fontWeight: FontWeight.w900)),
+                const Text(
+                  "Photo du reçu",
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
@@ -144,12 +165,17 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.camera_alt_outlined,
-                                      size: 28, color: AppColors.primary),
+                                  Icon(
+                                    Icons.camera_alt_outlined,
+                                    size: 28,
+                                    color: AppColors.primary,
+                                  ),
                                   SizedBox(height: 10),
-                                  Text("Appuyez pour prendre une photo",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w800)),
+                                  Text(
+                                    "Appuyez pour prendre une photo",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w800),
+                                  ),
                                 ],
                               ),
                             )
@@ -168,8 +194,10 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Détails",
-                    style: TextStyle(fontWeight: FontWeight.w900)),
+                const Text(
+                  "Détails",
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 10),
                 _label("Catégorie"),
                 _dropdown(),
@@ -183,12 +211,15 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 14),
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: AppColors.textMuted.withOpacity(0.15)),
+                            color: AppColors.textMuted.withOpacity(0.15),
+                          ),
                         ),
                         child: Text(
                           "${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}",
@@ -204,7 +235,9 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(
-                            color: AppColors.primary, width: 1.6),
+                          color: AppColors.primary,
+                          width: 1.6,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -223,24 +256,27 @@ class _EmployeScanFraisScreenState extends State<EmployeScanFraisScreen> {
             width: double.infinity,
             height: 54,
             child: ElevatedButton.icon(
-              onPressed: _loading ? null : _saveTempAndGoList,
+              onPressed: _loading ? null : _submitExpense,
               icon: _loading
                   ? const SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.check),
               label: Text(
-                _loading ? "Enregistrement..." : "Enregistrer",
+                _loading ? "Envoi..." : "Envoyer le frais",
                 style: const TextStyle(fontWeight: FontWeight.w900),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),

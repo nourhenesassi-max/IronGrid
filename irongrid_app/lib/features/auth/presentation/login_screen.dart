@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/storage/secure_store.dart';
 import '../../../core/ui/app_colors.dart';
 import '../../../core/ui/app_widgets.dart';
-import '../data/auth_service.dart';
+import '../data/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,107 +14,162 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _auth = AuthService();
+  final AuthService _auth = AuthService();
 
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+  final TextEditingController _emailCtrl = TextEditingController();
+  final TextEditingController _passCtrl = TextEditingController();
 
   bool _obscure = true;
   bool _loading = false;
 
-  final List<String> _roleLabels = const [
-    "Manager",
-    "RH",
-    "Finance",
-    "Employé",
-  ];
-
-  /// Mapping UI -> backend
-  final Map<String, String> _roleToApi = const {
-    "Manager": "MANAGER",
-    "RH": "RH",
-    "Finance": "FINANCE",
-    "Employé": "EMPLOYE",
-  };
-
-  /// 🔹 Default role for testing
-  String _roleLabel = "Employé";
-
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
   }
 
-  /// 🔐 LOGIN (TEMP MODE ALLOWS EMPTY FIELDS)
+  String? _validateEmail(String email) {
+    if (email.isEmpty) return "Veuillez saisir votre email.";
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!regex.hasMatch(email)) return "Adresse email invalide.";
+    return null;
+  }
+
+  Future<void> _saveAuthSession({
+    required String token,
+    required String role,
+    required String email,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final existingImagePath = await SecureStore.getProfileImagePath();
+    final existingProfileName = await SecureStore.getProfileName();
+    final existingProfileEmail = await SecureStore.getProfileEmail();
+    final existingProfilePhone = await SecureStore.getProfilePhone();
+    final existingProfileDepartment = await SecureStore.getProfileDepartment();
+
+    await prefs.setString('token', token);
+    await prefs.setString('role', role);
+    await prefs.setString('email', email);
+
+    await SecureStore.saveToken(token);
+    await SecureStore.saveRole(role);
+    await SecureStore.saveManagerEmail(email);
+    await SecureStore.saveManagerRole(role);
+
+    final existingManagerName = await SecureStore.getManagerName();
+    final existingManagerPhone = await SecureStore.getManagerPhone();
+
+    if (existingManagerName == null) {
+      await SecureStore.saveManagerName('');
+    }
+
+    if (existingManagerPhone == null) {
+      await SecureStore.saveManagerPhone('');
+    }
+
+    if (existingImagePath != null && existingImagePath.isNotEmpty) {
+      await SecureStore.saveProfileImagePath(existingImagePath);
+    }
+
+    if (existingProfileName != null ||
+        existingProfileEmail != null ||
+        existingProfilePhone != null ||
+        existingProfileDepartment != null) {
+      await SecureStore.saveProfile(
+        name: existingProfileName ?? '',
+        email: existingProfileEmail ?? '',
+        phone: existingProfilePhone ?? '',
+        department: existingProfileDepartment ?? '',
+      );
+    }
+  }
+
+  void _goToHomeByRole(String roleApi) {
+    if (!mounted) return;
+
+    switch (roleApi.toUpperCase()) {
+      case "ADMIN":
+        Navigator.pushNamedAndRemoveUntil(context, "/admin", (route) => false);
+        break;
+      case "EMPLOYE":
+      case "EMPLOYEE":
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          "/employe",
+          (route) => false,
+        );
+        break;
+      case "MANAGER":
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          "/manager",
+          (route) => false,
+        );
+        break;
+      case "RH":
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          "/rh/dashboard",
+          (route) => false,
+        );
+        break;
+      case "FINANCE":
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          "/finance",
+          (route) => false,
+        );
+        break;
+      default:
+        _snack("Rôle non reconnu : $roleApi");
+    }
+  }
+
   Future<void> _login() async {
-    final email = _emailCtrl.text.trim();
+    if (_loading) return;
+
+    final email = _emailCtrl.text.trim().toLowerCase();
     final pass = _passCtrl.text.trim();
 
-    // ✅ TEMPORARY: allow login without email/password
-    if (email.isEmpty || pass.isEmpty) {
-      final roleApi = _roleToApi[_roleLabel]!;
-
-      await SecureStore.saveRole(roleApi);
-      await SecureStore.saveToken("TEMP_TOKEN");
-
-      if (!mounted) return;
-
-      // ✅ Route by role (temporary)
-      switch (roleApi) {
-        case "EMPLOYE":
-          Navigator.pushReplacementNamed(context, "/employe");
-          break;
-        case "MANAGER":
-          Navigator.pushReplacementNamed(context, "/manager");
-          break;
-        case "RH":
-          Navigator.pushReplacementNamed(context, "/rh");
-          break;
-        case "FINANCE":
-          Navigator.pushReplacementNamed(context, "/finance");
-          break;
-        default:
-          Navigator.pushReplacementNamed(context, "/login");
-      }
+    final emailError = _validateEmail(email);
+    if (emailError != null) {
+      _snack(emailError);
       return;
     }
 
-    // 🔹 Real login when fields filled
-    setState(() => _loading = true);
-    try {
-      final roleApi = _roleToApi[_roleLabel]!;
+    if (pass.isEmpty) {
+      _snack("Veuillez saisir votre mot de passe.");
+      return;
+    }
 
-      final token = await _auth.login(
-        role: roleApi,
+    setState(() => _loading = true);
+
+    try {
+      final result = await _auth.login(
         email: email,
         password: pass,
       );
 
-      await SecureStore.saveToken(token);
-      await SecureStore.saveRole(roleApi);
+      await _saveAuthSession(
+        token: result.token,
+        role: result.role,
+        email: result.email,
+      );
 
       if (!mounted) return;
 
-      // ✅ Route by role after real login
-      switch (roleApi) {
-        case "EMPLOYE":
-          Navigator.pushReplacementNamed(context, "/employe");
-          break;
-        case "MANAGER":
-          Navigator.pushReplacementNamed(context, "/manager");
-          break;
-        case "RH":
-          Navigator.pushReplacementNamed(context, "/rh");
-          break;
-        case "FINANCE":
-          Navigator.pushReplacementNamed(context, "/finance");
-          break;
-        default:
-          Navigator.pushReplacementNamed(context, "/login");
-      }
+      _snack("Connexion réussie");
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      _goToHomeByRole(result.role);
     } catch (e) {
-      _snack("Erreur: $e");
+      _snack(e.toString().replaceFirst('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -127,6 +184,16 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -141,8 +208,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  child:
-                      const Icon(Icons.factory, color: Colors.white, size: 44),
+                  child: const Icon(
+                    Icons.factory,
+                    color: Colors.white,
+                    size: 44,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 const Text(
@@ -165,20 +235,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   "Connectez-vous pour continuer",
-                  style: TextStyle(fontSize: 16, color: AppColors.textMuted),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textMuted,
+                  ),
                 ),
                 const SizedBox(height: 26),
-                _label("Sélectionner votre rôle"),
-                const SizedBox(height: 8),
-                RoleDropdown(
-                  value: _roleLabel,
-                  items: _roleLabels,
-                  onChanged: (v) => setState(() => _roleLabel = v),
-                ),
-                const SizedBox(height: 16),
                 AppInput(
                   hint: "Email",
-                  icon: Icons.person_outline,
+                  icon: Icons.email_outlined,
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
                 ),
@@ -200,10 +265,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, "/reset-password"),
+                    onPressed: _loading
+                        ? null
+                        : () => Navigator.pushNamed(context, "/reset-password"),
                     child: const Text(
-                      "Mot de passe oublié?",
+                      "Mot de passe oublié ?",
                       style: TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
@@ -225,11 +291,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     child: _loading
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.4,
+                            ),
+                          )
                         : const Text(
-                            "Se Connecter",
+                            "Se connecter",
                             style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w700),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                   ),
                 ),
@@ -242,7 +317,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: AppColors.textMuted),
                     ),
                     TextButton(
-                      onPressed: () => Navigator.pushNamed(context, "/signup"),
+                      onPressed: _loading
+                          ? null
+                          : () => Navigator.pushNamed(context, "/signup"),
                       child: const Text(
                         "Créer un compte",
                         style: TextStyle(
@@ -253,40 +330,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: const [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14),
-                      child: Text("OU",
-                          style: TextStyle(color: AppColors.textMuted)),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _snack("Biométrie: à brancher après"),
-                    icon: const Icon(Icons.fingerprint, size: 22),
-                    label: const Text(
-                      "Authentification biométrique",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(
-                          color: AppColors.primary, width: 1.6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -294,16 +337,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  Widget _label(String s) => Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          s,
-          style: const TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
 }
